@@ -107,7 +107,7 @@ masih kosong. Setelah itu ganti password lewat **Edit Profile** atau dashboard a
 
 ## 3. Simpan ke GitHub
 
-Buka https://github.com/dapakyuu/PortalBeritaWinnicode/settings/secrets/actions
+Buka https://github.com/dapakyuu/WinnicodePortalBerita/settings/secrets/actions
 (**Settings → Secrets and variables → Actions**).
 
 **Tab "Secrets"** → **New repository secret**:
@@ -128,7 +128,7 @@ Buka https://github.com/dapakyuu/PortalBeritaWinnicode/settings/secrets/actions
 
 ## 4. Jalankan deploy pertama
 
-1. Buka https://github.com/dapakyuu/PortalBeritaWinnicode/actions.
+1. Buka https://github.com/dapakyuu/WinnicodePortalBerita/actions.
 2. Pilih workflow **Build & Deploy ke VPS** → **Run workflow** → **Run workflow**.
 
 | Job                          | Fungsi                                                              |

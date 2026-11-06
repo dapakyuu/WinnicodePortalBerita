@@ -13,7 +13,7 @@
 services:
   winnicode:
     build:
-      context: https://github.com/dapakyuu/PortalBeritaWinnicode.git#${DEPLOY_COMMIT:-main}
+      context: https://github.com/dapakyuu/WinnicodePortalBerita.git#${DEPLOY_COMMIT:-main}
       dockerfile: Dockerfile
     restart: unless-stopped
     expose:
