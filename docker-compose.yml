@@ -1,0 +1,67 @@
+# Portal Berita WinniCode — https://winnicode.forensa.tech
+#
+# Di-deploy otomatis oleh GitHub Actions lewat Hostinger API (Docker Manager),
+# sama seperti Portofolio & Forensa. Source code diambil langsung dari GitHub pada
+# commit yang sedang di-deploy (DEPLOY_COMMIT), jadi setiap push pasti ter-build ulang.
+#
+# Memakai Traefik yang sudah berjalan di VPS, jadi container ini TIDAK membuka
+# port 80/443 sendiri. Traefik meneruskan request winnicode.forensa.tech ke sini
+# dan membuat sertifikat HTTPS Let's Encrypt secara otomatis.
+#
+# APP_KEY dan ADMIN_PASSWORD dikirim dari GitHub Secrets (lihat docs/DEPLOY.md).
+
+services:
+  winnicode:
+    build:
+      context: https://github.com/dapakyuu/PortalBeritaWinnicode.git#${DEPLOY_COMMIT:-main}
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    expose:
+      - "80"
+    environment:
+      APP_NAME: WinniCode
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_KEY: ${APP_KEY:?APP_KEY wajib diisi}
+      APP_URL: https://winnicode.forensa.tech
+      APP_TIMEZONE: Asia/Jakarta
+      APP_LOCALE: en
+      # Hanya dipakai saat database pertama kali dibuat (akun admin "daffa")
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      DB_CONNECTION: sqlite
+      DB_DATABASE: /var/www/html/storage/database/database.sqlite
+      SESSION_DRIVER: database
+      SESSION_SECURE_COOKIE: "true"
+      CACHE_STORE: database
+      QUEUE_CONNECTION: sync
+      FILESYSTEM_DISK: local
+      LOG_CHANNEL: stderr
+      LOG_LEVEL: warning
+    volumes:
+      # Database SQLite + gambar unggahan. Tetap ada walau container dibuat ulang.
+      - winnicode-storage:/var/www/html/storage
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.services.winnicode.loadbalancer.server.port=80"
+      # HTTPS
+      - "traefik.http.routers.winnicode.rule=Host(`winnicode.forensa.tech`)"
+      - "traefik.http.routers.winnicode.entrypoints=websecure"
+      - "traefik.http.routers.winnicode.service=winnicode"
+      - "traefik.http.routers.winnicode.tls=true"
+      - "traefik.http.routers.winnicode.tls.certresolver=letsencrypt"
+      # HTTP -> alihkan ke HTTPS
+      - "traefik.http.routers.winnicode-http.rule=Host(`winnicode.forensa.tech`)"
+      - "traefik.http.routers.winnicode-http.entrypoints=web"
+      - "traefik.http.routers.winnicode-http.service=winnicode"
+      - "traefik.http.routers.winnicode-http.middlewares=winnicode-https-redirect"
+      - "traefik.http.middlewares.winnicode-https-redirect.redirectscheme.scheme=https"
+      - "traefik.http.middlewares.winnicode-https-redirect.redirectscheme.permanent=true"
+    networks:
+      - winnicode-network
+
+volumes:
+  winnicode-storage:
+
+networks:
+  winnicode-network:
+    driver: bridge

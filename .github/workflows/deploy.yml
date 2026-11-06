@@ -1,0 +1,97 @@
+name: Build & Deploy ke VPS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # bisa dijalankan manual dari tab Actions
+
+permissions:
+  contents: read
+
+# Jangan jalankan dua deploy bersamaan
+concurrency:
+  group: winnicode-production
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build & uji image Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Build image
+        run: docker build -t winnicode:ci .
+
+      - name: Jalankan container & cek halaman
+        run: |
+          docker run -d --name winnicode -p 8080:80 \
+            -e APP_ENV=production -e APP_DEBUG=false \
+            -e APP_KEY="base64:$(openssl rand -base64 32)" \
+            -e APP_URL=http://localhost:8080 \
+            -e ADMIN_PASSWORD=ci-password-123 \
+            -e DB_CONNECTION=sqlite \
+            -e DB_DATABASE=/var/www/html/storage/database/database.sqlite \
+            -e SESSION_DRIVER=database -e CACHE_STORE=database -e LOG_CHANNEL=stderr \
+            winnicode:ci
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/up > /dev/null && break
+            sleep 2
+          done
+          curl -fsS http://localhost:8080/up > /dev/null
+          curl -fsS --max-time 90 http://localhost:8080/ | grep -q 'WinniCode'
+          curl -fsS -o /dev/null http://localhost:8080/css/style.css
+          curl -fsS -o /dev/null http://localhost:8080/images/logo/winnicode.png
+          curl -fsS http://localhost:8080/berita | grep -q 'post-card'
+          # Dashboard admin wajib login
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/admin)" = "302"
+          echo "Container OK"
+
+      - name: Tampilkan log container
+        if: always()
+        run: docker logs winnicode || true
+
+  deploy:
+    name: Deploy ke VPS Hostinger
+    needs: build
+    # Hanya deploy saat push ke main atau dijalankan manual (bukan saat pull request)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Cek secret & variable sudah diisi
+        id: check
+        env:
+          API_KEY: ${{ secrets.HOSTINGER_API_KEY }}
+          VM_ID: ${{ vars.HOSTINGER_VM_ID }}
+          APP_KEY: ${{ secrets.APP_KEY }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+        run: |
+          missing=""
+          [ -n "$API_KEY" ] || missing="$missing HOSTINGER_API_KEY"
+          [ -n "$VM_ID" ] || missing="$missing HOSTINGER_VM_ID"
+          [ -n "$APP_KEY" ] || missing="$missing APP_KEY"
+          [ -n "$ADMIN_PASSWORD" ] || missing="$missing ADMIN_PASSWORD"
+          if [ -n "$missing" ]; then
+            echo "::warning::Belum diisi:$missing. Deploy dilewati. Lihat docs/DEPLOY.md langkah 3."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Deploy lewat Hostinger API (Docker Manager)
+        if: steps.check.outputs.ready == 'true'
+        uses: hostinger/deploy-on-vps@v2
+        with:
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ vars.HOSTINGER_VM_ID }}
+          project-name: winnicode
+          docker-compose-path: docker-compose.yml
+          environment-variables: |
+            DEPLOY_COMMIT=${{ github.sha }}
+            APP_KEY=${{ secrets.APP_KEY }}
+            ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
