@@ -22,7 +22,6 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-.env.bak-sqlite
 
 # Dokumen pribadi (logbook, desain) - jangan di-upload
 /konteks/

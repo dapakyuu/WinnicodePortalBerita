@@ -25,12 +25,6 @@ Bedanya dengan Portofolio, website ini punya **data yang harus disimpan**: datab
 PostgreSQL (service `db`, volume `winnicode-pgdata`) dan gambar unggahan (volume
 `winnicode-storage`). Keduanya **tidak hilang** saat redeploy.
 
-> **Pindah dari SQLite:** saat container start dan database PostgreSQL masih kosong,
-> `entrypoint.sh` otomatis menyalin isi file SQLite lama
-> (`storage/database/database.sqlite` di volume `winnicode-storage`) lewat
-> `php artisan db:salin-dari-sqlite`. Jika file itu tidak ada, seeder data awal dijalankan.
-> File SQLite lama tidak dihapus, jadi tetap bisa dipakai sebagai cadangan.
-
 Isi container (lihat `Dockerfile` dan `docker/`):
 
 | Bagian           | Fungsi                                                               |
@@ -212,8 +206,7 @@ di database tidak otomatis dihapus.
 Data tersimpan di dua volume:
 
 - `winnicode-pgdata` — seluruh isi database PostgreSQL
-- `winnicode-storage` → `app/public/` — gambar unggahan (berita, avatar, banner, kategori),
-  plus `database/database.sqlite` (database lama sebelum pindah ke PostgreSQL)
+- `winnicode-storage` → `app/public/` — gambar unggahan (berita, avatar, banner, kategori)
 
 Jangan menghapus volume ini (mis. tombol **Delete** project beserta volume di Docker
 Manager), karena seluruh data website ikut hilang. Untuk backup, lewat terminal VPS:

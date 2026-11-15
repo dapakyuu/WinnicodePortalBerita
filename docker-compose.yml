@@ -66,8 +66,7 @@ services:
       LOG_CHANNEL: stderr
       LOG_LEVEL: warning
     volumes:
-      # Gambar unggahan (+ file SQLite lama, sumber salinan data saat pindah ke PostgreSQL).
-      # Tetap ada walau container dibuat ulang.
+      # Gambar unggahan. Tetap ada walau container dibuat ulang.
       - winnicode-storage:/var/www/html/storage
     labels:
       - "traefik.enable=true"

@@ -14,8 +14,7 @@ RUN composer dump-autoload --no-dev --optimize --no-scripts
 FROM php:8.3-fpm-alpine
 
 # Ekstensi bawaan image sudah mencakup pdo_sqlite, mbstring, curl, xml, dll.
-# pdo_pgsql untuk PostgreSQL (database utama); pdo_sqlite tetap ada untuk
-# menyalin data dari database SQLite lama (php artisan db:salin-dari-sqlite).
+# pdo_pgsql ditambahkan untuk PostgreSQL (database utama).
 RUN apk add --no-cache nginx libpq \
     && apk add --no-cache --virtual .build-deps postgresql-dev \
     && docker-php-ext-install opcache pdo_mysql pdo_pgsql \
@@ -35,7 +34,7 @@ RUN sed -i 's/\r$//' /usr/local/bin/entrypoint \
     && php artisan package:discover \
     && chown -R www-data:www-data storage bootstrap/cache
 
-# Data yang harus bertahan saat redeploy: file unggahan (& file SQLite lama)
+# Data yang harus bertahan saat redeploy: file unggahan
 VOLUME ["/var/www/html/storage"]
 
 EXPOSE 80
