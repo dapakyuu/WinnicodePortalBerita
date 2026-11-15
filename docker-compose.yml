@@ -8,14 +8,35 @@
 # port 80/443 sendiri. Traefik meneruskan request winnicode.forensa.tech ke sini
 # dan membuat sertifikat HTTPS Let's Encrypt secara otomatis.
 #
-# APP_KEY dan ADMIN_PASSWORD dikirim dari GitHub Secrets (lihat docs/DEPLOY.md).
+# APP_KEY, ADMIN_PASSWORD, dan DB_PASSWORD dikirim dari GitHub Secrets (lihat docs/DEPLOY.md).
 
 services:
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: winnicode
+      POSTGRES_USER: winnicode
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD wajib diisi}
+    volumes:
+      # PostgreSQL 18 menyimpan data di subfolder versi di dalam /var/lib/postgresql
+      - winnicode-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U winnicode -d winnicode"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - winnicode-network
+
   winnicode:
     build:
       context: https://github.com/dapakyuu/WinnicodePortalBerita.git#${DEPLOY_COMMIT:-main}
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
     expose:
       - "80"
     environment:
@@ -28,8 +49,15 @@ services:
       APP_LOCALE: en
       # Hanya dipakai saat database pertama kali dibuat (akun admin "daffa")
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
-      DB_CONNECTION: sqlite
-      DB_DATABASE: /var/www/html/storage/database/database.sqlite
+      DB_CONNECTION: pgsql
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_DATABASE: winnicode
+      DB_USERNAME: winnicode
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD wajib diisi}
+      # Login dengan Google (opsional, tombol disembunyikan bila kosong)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       SESSION_DRIVER: database
       SESSION_SECURE_COOKIE: "true"
       CACHE_STORE: database
@@ -38,7 +66,8 @@ services:
       LOG_CHANNEL: stderr
       LOG_LEVEL: warning
     volumes:
-      # Database SQLite + gambar unggahan. Tetap ada walau container dibuat ulang.
+      # Gambar unggahan (+ file SQLite lama, sumber salinan data saat pindah ke PostgreSQL).
+      # Tetap ada walau container dibuat ulang.
       - winnicode-storage:/var/www/html/storage
     labels:
       - "traefik.enable=true"
@@ -61,6 +90,7 @@ services:
 
 volumes:
   winnicode-storage:
+  winnicode-pgdata:
 
 networks:
   winnicode-network:

@@ -14,6 +14,7 @@
             @include('partials.input', ['name' => 'password', 'label' => 'Password', 'type' => 'password', 'autocomplete' => 'new-password'])
             @include('partials.input', ['name' => 'password_confirmation', 'label' => 'Konfirmasi Password', 'type' => 'password', 'autocomplete' => 'new-password'])
             <button type="submit" class="btn-pill">Register</button>
+            @include('auth.partials.google')
             <p class="auth__switch">Sudah punya akun? <a href="{{ route('login') }}">Login di sini</a></p>
         </form>
     </section>

@@ -27,11 +27,24 @@ php artisan view:cache
 
 php artisan migrate --force
 
-# Isi data awal hanya jika database masih kosong (deploy pertama)
+# Database masih kosong: pindahkan data dari SQLite lama bila ada, kalau tidak isi data awal
+# (Jika penyalinan gagal, container berhenti dengan error agar data lama tidak tertimpa seeder.)
 USERS=$(php artisan tinker --execute='echo \App\Models\User::count();' 2>/dev/null | tail -n 1)
-if [ "$USERS" = "0" ]; then
-    echo "Database kosong: menjalankan seeder data awal..."
-    php artisan db:seed --force
+OLD_SQLITE=/var/www/html/storage/database/database.sqlite
+OLD_USERS=0
+if [ "${DB_CONNECTION:-sqlite}" = "pgsql" ] && [ -s "$OLD_SQLITE" ]; then
+    OLD_USERS=$(php -r 'try { echo (new PDO("sqlite:".$argv[1]))->query("SELECT COUNT(*) FROM users")->fetchColumn(); } catch (Throwable $e) { echo 0; }' "$OLD_SQLITE")
+fi
+if [ -z "$USERS" ]; then
+    echo "PERINGATAN: jumlah user tidak bisa dicek, seeder/penyalinan dilewati." >&2
+elif [ "$USERS" = "0" ]; then
+    if [ "$OLD_USERS" != "0" ]; then
+        echo "Database kosong: menyalin data dari SQLite lama ($OLD_USERS user)..."
+        php artisan db:salin-dari-sqlite --path="$OLD_SQLITE"
+    else
+        echo "Database kosong: menjalankan seeder data awal..."
+        php artisan db:seed --force
+    fi
 fi
 
 chown -R www-data:www-data storage bootstrap/cache

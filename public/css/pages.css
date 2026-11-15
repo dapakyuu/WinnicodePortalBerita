@@ -360,6 +360,22 @@ body.page-gradient {
 .auth__form .btn-pill { align-self: center; }
 .auth__switch { margin-top: -16px; text-align: center; font-size: 13px; color: var(--black-75); }
 .auth__switch a { color: var(--primary); font-weight: 500; }
+.auth__divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: -12px;
+    font-size: 13px;
+    color: var(--black-75);
+}
+.auth__divider::before,
+.auth__divider::after { content: ''; flex: 1; height: 1px; background: rgba(0, 0, 0, 0.1); }
+.auth__google {
+    align-self: center;
+    margin-top: -16px;
+    box-shadow: var(--shadow);
+}
+.auth__google i { color: #ea4335; }
 
 /* ---------- 404 ---------- */
 

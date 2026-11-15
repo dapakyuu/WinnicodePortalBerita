@@ -22,8 +22,14 @@ Cara kerjanya sama dengan Portofolio:
   container dan membuat sertifikat HTTPS secara otomatis.
 
 Bedanya dengan Portofolio, website ini punya **data yang harus disimpan**: database
-SQLite dan gambar unggahan. Keduanya ada di volume Docker `winnicode-storage`,
-jadi **tidak hilang** saat redeploy.
+PostgreSQL (service `db`, volume `winnicode-pgdata`) dan gambar unggahan (volume
+`winnicode-storage`). Keduanya **tidak hilang** saat redeploy.
+
+> **Pindah dari SQLite:** saat container start dan database PostgreSQL masih kosong,
+> `entrypoint.sh` otomatis menyalin isi file SQLite lama
+> (`storage/database/database.sqlite` di volume `winnicode-storage`) lewat
+> `php artisan db:salin-dari-sqlite`. Jika file itu tidak ada, seeder data awal dijalankan.
+> File SQLite lama tidak dihapus, jadi tetap bisa dipakai sebagai cadangan.
 
 Isi container (lihat `Dockerfile` dan `docker/`):
 
@@ -103,6 +109,13 @@ masih kosong. Setelah itu ganti password lewat **Edit Profile** atau dashboard a
 > Di production, akun penulis contoh lain (louis, james, dst.) diberi password acak,
 > jadi tidak bisa dipakai login. User baru mendaftar sendiri lewat halaman Register.
 
+### DB_PASSWORD
+
+Password database PostgreSQL (user `winnicode`). Buat acak dan panjang, mis.
+`openssl rand -base64 24`. Password ini dipakai saat volume `winnicode-pgdata` pertama
+kali dibuat, jadi **jangan diganti** setelah deploy pertama. Kalau diganti, container
+aplikasi tidak bisa login ke database.
+
 ---
 
 ## 3. Simpan ke GitHub
@@ -117,6 +130,15 @@ Buka https://github.com/dapakyuu/WinnicodePortalBerita/settings/secrets/actions
 | `HOSTINGER_API_KEY` | API key dari langkah 2             |
 | `APP_KEY`           | hasil `php artisan key:generate --show` |
 | `ADMIN_PASSWORD`    | password admin pilihanmu           |
+| `DB_PASSWORD`       | password database PostgreSQL       |
+| `GOOGLE_CLIENT_ID`     | (opsional) OAuth Client ID untuk login Google |
+| `GOOGLE_CLIENT_SECRET` | (opsional) OAuth Client Secret untuk login Google |
+
+> **Login dengan Google:** buat OAuth Client di
+> [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+> (tipe *Web application*), isi **Authorized redirect URI** dengan
+> `https://winnicode.forensa.tech/auth/google/callback`, lalu simpan Client ID & Secret
+> sebagai dua secret di atas. Selama secret ini kosong, tombol Google tidak ditampilkan.
 
 **Tab "Variables"** → **New repository variable**:
 
@@ -187,21 +209,29 @@ di database tidak otomatis dihapus.
 
 ## 7. Backup data
 
-Semua data ada di volume `winnicode-storage`:
+Data tersimpan di dua volume:
 
-- `database/database.sqlite` — seluruh isi database
-- `app/public/` — gambar unggahan (berita, avatar, banner, kategori)
+- `winnicode-pgdata` — seluruh isi database PostgreSQL
+- `winnicode-storage` → `app/public/` — gambar unggahan (berita, avatar, banner, kategori),
+  plus `database/database.sqlite` (database lama sebelum pindah ke PostgreSQL)
 
 Jangan menghapus volume ini (mis. tombol **Delete** project beserta volume di Docker
-Manager), karena seluruh data website ikut hilang. Untuk backup, salin isi volume
-lewat terminal VPS:
+Manager), karena seluruh data website ikut hilang. Untuk backup, lewat terminal VPS:
 
 ```bash
+# Database PostgreSQL
+docker exec winnicode-db-1 pg_dump -U winnicode -d winnicode -Fc > winnicode-$(date +%F).dump
+
+# Gambar unggahan
 docker run --rm -v winnicode_winnicode-storage:/data -v "$PWD":/backup alpine \
-  tar czf /backup/winnicode-$(date +%F).tar.gz -C /data .
+  tar czf /backup/winnicode-storage-$(date +%F).tar.gz -C /data .
 ```
 
-(Nama volume bisa dicek dengan `docker volume ls | grep winnicode`.)
+Pulihkan database dengan
+`docker exec -i winnicode-db-1 pg_restore -U winnicode -d winnicode --clean < file.dump`.
+
+(Nama container/volume bisa dicek dengan `docker ps | grep winnicode` dan
+`docker volume ls | grep winnicode`.)
 
 ---
 
@@ -262,9 +292,15 @@ Pastikan bagian `volumes:` di `docker-compose.yml` tidak diubah dan volume
 
 ```bash
 docker build -t winnicode .
-docker run --rm -p 8080:80 \
+docker network create winnicode-local
+docker run -d --name winnicode-db --network winnicode-local \
+  -e POSTGRES_DB=winnicode -e POSTGRES_USER=winnicode -e POSTGRES_PASSWORD=rahasia \
+  -v winnicode-local-pg:/var/lib/postgresql postgres:18-alpine
+docker run --rm -p 8080:80 --network winnicode-local \
   -e APP_KEY="$(php artisan key:generate --show)" \
   -e APP_URL=http://localhost:8080 -e ADMIN_PASSWORD=password123 \
+  -e DB_CONNECTION=pgsql -e DB_HOST=winnicode-db -e DB_DATABASE=winnicode \
+  -e DB_USERNAME=winnicode -e DB_PASSWORD=rahasia \
   -v winnicode-local:/var/www/html/storage \
   winnicode
 # buka http://localhost:8080

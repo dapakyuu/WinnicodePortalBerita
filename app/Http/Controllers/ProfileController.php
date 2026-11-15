@@ -168,7 +168,10 @@ class ProfileController extends Controller
             'name' => ['required', 'string', 'max:50'],
             'username' => ['required', 'alpha_dash', 'max:50', Rule::unique('users')->ignore($user->id)],
             'email' => ['required', 'email', 'max:50', Rule::unique('users')->ignore($user->id)],
-            'old_password' => ['nullable', 'required_with:password', 'current_password'],
+            // User dari Google belum punya password: boleh langsung membuat password baru
+            'old_password' => $user->password
+                ? ['nullable', 'required_with:password', 'current_password']
+                : ['nullable'],
             'password' => ['nullable', Password::min(8)],
             'banner' => ['nullable', 'image', 'max:4096'],
             'avatar' => ['nullable', 'image', 'max:2048'],

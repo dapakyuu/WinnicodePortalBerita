@@ -25,15 +25,26 @@ jobs:
       - name: Build image
         run: docker build -t winnicode:ci .
 
+      - name: Jalankan PostgreSQL
+        run: |
+          docker network create winnicode-ci
+          docker run -d --name db --network winnicode-ci \
+            -e POSTGRES_DB=winnicode -e POSTGRES_USER=winnicode -e POSTGRES_PASSWORD=ci-db-password \
+            postgres:18-alpine
+          for i in $(seq 1 30); do
+            docker exec db pg_isready -U winnicode -d winnicode && break
+            sleep 2
+          done
+
       - name: Jalankan container & cek halaman
         run: |
-          docker run -d --name winnicode -p 8080:80 \
+          docker run -d --name winnicode --network winnicode-ci -p 8080:80 \
             -e APP_ENV=production -e APP_DEBUG=false \
             -e APP_KEY="base64:$(openssl rand -base64 32)" \
             -e APP_URL=http://localhost:8080 \
             -e ADMIN_PASSWORD=ci-password-123 \
-            -e DB_CONNECTION=sqlite \
-            -e DB_DATABASE=/var/www/html/storage/database/database.sqlite \
+            -e DB_CONNECTION=pgsql -e DB_HOST=db -e DB_PORT=5432 \
+            -e DB_DATABASE=winnicode -e DB_USERNAME=winnicode -e DB_PASSWORD=ci-db-password \
             -e SESSION_DRIVER=database -e CACHE_STORE=database -e LOG_CHANNEL=stderr \
             winnicode:ci
           for i in $(seq 1 60); do
@@ -51,7 +62,9 @@ jobs:
 
       - name: Tampilkan log container
         if: always()
-        run: docker logs winnicode || true
+        run: |
+          docker logs winnicode || true
+          docker logs db || true
 
   deploy:
     name: Deploy ke VPS Hostinger
@@ -70,12 +83,14 @@ jobs:
           VM_ID: ${{ vars.HOSTINGER_VM_ID }}
           APP_KEY: ${{ secrets.APP_KEY }}
           ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
         run: |
           missing=""
           [ -n "$API_KEY" ] || missing="$missing HOSTINGER_API_KEY"
           [ -n "$VM_ID" ] || missing="$missing HOSTINGER_VM_ID"
           [ -n "$APP_KEY" ] || missing="$missing APP_KEY"
           [ -n "$ADMIN_PASSWORD" ] || missing="$missing ADMIN_PASSWORD"
+          [ -n "$DB_PASSWORD" ] || missing="$missing DB_PASSWORD"
           if [ -n "$missing" ]; then
             echo "::warning::Belum diisi:$missing. Deploy dilewati. Lihat docs/DEPLOY.md langkah 3."
             echo "ready=false" >> "$GITHUB_OUTPUT"
@@ -95,3 +110,6 @@ jobs:
             DEPLOY_COMMIT=${{ github.sha }}
             APP_KEY=${{ secrets.APP_KEY }}
             ADMIN_PASSWORD=${{ secrets.ADMIN_PASSWORD }}
+            DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+            GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}

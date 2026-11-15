@@ -15,7 +15,7 @@ class CommentController extends Controller
     {
         $comments = Comment::with(['user:id,name,username,avatar', 'post:id,title,slug', 'parent.user:id,name'])
             ->withCount('replies')
-            ->when($request->filled('q'), fn ($q) => $q->where('body', 'like', '%' . $request->q . '%'))
+            ->when($request->filled('q'), fn ($q) => $q->whereLike('body', '%' . $request->q . '%', caseSensitive: false))
             ->when($request->filled('post'), fn ($q) => $q->where('post_id', $request->post))
             ->when($request->type === 'root', fn ($q) => $q->whereNull('parent_id'))
             ->when($request->type === 'reply', fn ($q) => $q->whereNotNull('parent_id'))

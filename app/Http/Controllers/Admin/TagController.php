@@ -15,7 +15,7 @@ class TagController extends Controller
     public function index(Request $request): View
     {
         $tags = Tag::withCount('posts')
-            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->q . '%'))
+            ->when($request->filled('q'), fn ($q) => $q->whereLike('name', '%' . $request->q . '%', caseSensitive: false))
             ->when($request->sort === 'usage', fn ($q) => $q->orderByDesc('posts_count'), fn ($q) => $q->orderBy('name'))
             ->paginate(20)
             ->withQueryString();

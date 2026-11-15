@@ -21,7 +21,7 @@ class PostController extends Controller
     {
         $posts = Post::with(['user:id,name,username', 'category:id,name,slug'])
             ->withCount('comments')
-            ->when($request->filled('q'), fn ($q) => $q->where('title', 'like', '%' . $request->q . '%'))
+            ->when($request->filled('q'), fn ($q) => $q->whereLike('title', '%' . $request->q . '%', caseSensitive: false))
             ->when($request->filled('category'), fn ($q) => $q->where('category_id', $request->category))
             ->when($request->filled('author'), fn ($q) => $q->where('user_id', $request->author))
             ->when($request->status === 'published', fn ($q) => $q->published())

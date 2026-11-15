@@ -18,7 +18,7 @@ class CategoryController extends Controller
     public function index(Request $request): View
     {
         $categories = Category::withCount('posts')
-            ->when($request->filled('q'), fn ($q) => $q->where('name', 'like', '%' . $request->q . '%'))
+            ->when($request->filled('q'), fn ($q) => $q->whereLike('name', '%' . $request->q . '%', caseSensitive: false))
             ->orderBy('name')
             ->paginate(15)
             ->withQueryString();

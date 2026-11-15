@@ -75,9 +75,9 @@ class Post extends Model
         $term = trim((string) $term);
 
         return $term === '' ? $query : $query->where(fn ($q) => $q
-            ->where('title', 'like', "%{$term}%")
-            ->orWhere('content', 'like', "%{$term}%")
-            ->orWhereHas('tags', fn ($t) => $t->where('name', 'like', "%{$term}%")));
+            ->whereLike('title', "%{$term}%", caseSensitive: false)
+            ->orWhereLike('content', "%{$term}%", caseSensitive: false)
+            ->orWhereHas('tags', fn ($t) => $t->whereLike('name', "%{$term}%", caseSensitive: false)));
     }
 
     /** Urutan: new (terbaru), popular (views terbanyak), top (rating tertinggi). */

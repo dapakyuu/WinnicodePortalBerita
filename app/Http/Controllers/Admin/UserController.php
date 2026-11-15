@@ -19,9 +19,9 @@ class UserController extends Controller
     {
         $users = User::withCount(['posts', 'comments'])
             ->when($request->filled('q'), fn ($q) => $q->where(fn ($w) => $w
-                ->where('name', 'like', '%' . $request->q . '%')
-                ->orWhere('username', 'like', '%' . $request->q . '%')
-                ->orWhere('email', 'like', '%' . $request->q . '%')))
+                ->whereLike('name', '%' . $request->q . '%', caseSensitive: false)
+                ->orWhereLike('username', '%' . $request->q . '%', caseSensitive: false)
+                ->orWhereLike('email', '%' . $request->q . '%', caseSensitive: false)))
             ->when(in_array($request->role, ['admin', 'user'], true), fn ($q) => $q->where('role', $request->role))
             ->latest()
             ->paginate(15)
